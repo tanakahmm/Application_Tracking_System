@@ -157,49 +157,97 @@ def submit_candidate():
         skills = request.form.get("skills")
         education = request.form.get("education")
         experience = request.form.get("experience")
-        created_by = request.form.get("created_by", type=int)  # Get created_by from form
-        resume = request.files.get("resume")  # file
+        requirement_id = request.form.get("requirement_id")
+        source = request.form.get("source", "MANUAL")
+        created_by = request.form.get("created_by", type=int)  # recruiter_id or None
 
-        if not all([name, email]):
-            return jsonify({"message": "Name and email are required"}), 400
+        if not name or not email or not phone:
+            return jsonify({"message": "Name, email and phone are required."}), 400
 
         # ------------------- Resume Upload -------------------
-        filename = None
-        if resume and allowed_file(resume.filename):
-            filename = secure_filename(resume.filename)
-            resume.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-        elif resume:
-            return jsonify({"message": "Invalid file type"}), 400
+        # Support both 'resume' and 'resume_file' for backward compatibility
+        resume_file = request.files.get("resume_file") or request.files.get("resume")
+        resume_filename = None
 
-        # ------------------- Insert into DB -------------------
+        if resume_file:
+            if allowed_file(resume_file.filename):
+                resume_filename = secure_filename(resume_file.filename)
+                upload_path = app.config["UPLOAD_FOLDER"]
+                Path(upload_path).mkdir(parents=True, exist_ok=True)
+                resume_file.save(os.path.join(upload_path, resume_filename))
+            else:
+                return jsonify({"message": "Invalid file type"}), 400
+
+        # ------------------- Database Connection -------------------
         conn = get_db_connection()
         if not conn:
             return jsonify({"message": "Database connection failed"}), 500
 
         cursor = conn.cursor()
-        # Include created_by in INSERT if provided
-        if created_by:
-            cursor.execute("""
-                INSERT INTO candidates
-                (name, email, phone, skills, education, experience, resume_filename, created_by)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (name, email, phone, skills, education, experience, filename, created_by))
-        else:
-            cursor.execute("""
-                INSERT INTO candidates
-                (name, email, phone, skills, education, experience, resume_filename)
-                VALUES (%s,%s,%s,%s,%s,%s,%s)
-            """, (name, email, phone, skills, education, experience, filename))
+
+        # ------------------- Auto-Assign Recruiter IF CREATED_BY IS NULL -------------------
+        final_created_by = created_by
+
+        if not created_by:
+            if requirement_id:
+                cursor.execute("""
+                    SELECT recruiter_id
+                    FROM requirement_allocations
+                    WHERE requirement_id = %s
+                    LIMIT 1
+                """, (requirement_id,))
+                row = cursor.fetchone()
+
+                if row:
+                    final_created_by = row[0]
+                else:
+                    final_created_by = 1  # admin/DM system ID
+            else:
+                final_created_by = 1  # admin/DM system ID if no requirement_id
+
+        # ------------------- Insert into DB -------------------
+        insert_query = """
+            INSERT INTO candidates
+            (name, email, phone, skills, education, experience, resume_filename,
+             created_by, source, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+
+        cursor.execute(insert_query, (
+            name, email, phone, skills, education, experience, resume_filename,
+            final_created_by, source
+        ))
 
         conn.commit()
+        candidate_id = cursor.lastrowid
+
+        # ------------------- Event → n8n -------------------
+        notify_event("candidate_added", {
+            "candidate_id": candidate_id,
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "source": source,
+            "assigned_to": final_created_by,
+            "requirement_id": requirement_id
+        })
+
         cursor.close()
         conn.close()
 
-        return jsonify({"message": f"✅ Candidate '{name}' submitted successfully!"}), 201
+        return jsonify({"message": "Candidate added successfully", "id": candidate_id}), 200
 
     except Exception as e:
-        print(e)
-        return jsonify({"message": "❌ Error submitting candidate", "error": str(e)}), 500
+        print("Error in submit_candidate:", e)
+        return jsonify({"message": str(e)}), 500
+    finally:
+        try:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+        except:
+            pass
 
 @app.route("/get-candidates", methods=["GET"])
 def get_candidates():
@@ -238,6 +286,7 @@ def get_candidates():
                     experience TEXT,
                     resume_filename VARCHAR(255),
                     created_by INT DEFAULT NULL,
+                    source VARCHAR(50) DEFAULT 'MANUAL',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (created_by) REFERENCES users(id)
                 )
@@ -265,6 +314,26 @@ def get_candidates():
             """)
             conn.commit()
             print("✅ Added 'created_by' column!")
+
+        # ------------------------------------------------
+        # 3️⃣ Check if source column exists — if not, ADD it
+        # ------------------------------------------------
+        cursor.execute("""
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = 'ats_system'
+            AND TABLE_NAME = 'candidates'
+            AND COLUMN_NAME = 'source'
+        """)
+
+        if not cursor.fetchone():
+            print("⚠ 'source' column missing — adding now...")
+            cursor.execute("""
+                ALTER TABLE candidates 
+                ADD COLUMN source VARCHAR(50) DEFAULT 'MANUAL'
+            """)
+            conn.commit()
+            print("✅ Added 'source' column!")
 
         # ------------------------------------------------
         # 4️⃣ Fetch candidates with role-based filtering
