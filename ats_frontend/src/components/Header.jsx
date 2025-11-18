@@ -20,17 +20,18 @@ function Header() {
       { to: "/clients", label: "Clients", icon: "🏢" },
       { to: "/requirements", label: "Requirements", icon: "📋" },
       { to: "/candidates", label: "Candidates", icon: "🎯" },
-      { to: "/create-requirement", label: "Create", icon: "➕" },
+      { to: "/interviews", label: "Interviews", icon: "➕" },
     ],
     DELIVERY_MANAGER: [
       { to: "/dm-dashboard", label: "Dashboard", icon: "📊" },
       { to: "/requirements", label: "Requirements", icon: "📋" },
-      { to: "/create-requirement", label: "Create", icon: "➕" },
+      { to: "/interviews", label: "Interviews", icon: "➕" },
       { to: "/candidates", label: "Candidates", icon: "🎯" },
     ],
     RECRUITER: [
       { to: "/recruiter-dashboard", label: "Dashboard", icon: "📊" },
       { to: "/candidates", label: "Candidates", icon: "🎯" },
+      { to: "/interviews", label: "Interviews", icon: "➕" },
     ],
   };
 

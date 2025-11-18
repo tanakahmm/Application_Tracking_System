@@ -56,6 +56,15 @@ def screen_candidate():
         ))
         conn.commit()
 
+        _touch_candidate_progress(
+            cursor,
+            candidate_id,
+            requirement["id"],
+            requirement.get("category", "IT"),
+            "Screening"
+        )
+        conn.commit()
+
         cursor.execute("""
             INSERT INTO assesment_queue (candidate_id, requirement_id, status)
             VALUES (%s, %s, 'PENDING')
@@ -89,6 +98,141 @@ def screen_candidate():
         return jsonify({"error": str(e)}), 500
 
 
+@screening_bp.route("/create-interview", methods=["POST"])
+def create_interview():
+    try:
+        data = request.json or {}
+        required_fields = [
+            "candidate_id",
+            "requirement_id",
+            "category",
+            "stage",
+            "date",
+            "time",
+            "duration",
+            "mode",
+            "interviewer",
+        ]
+        missing = [field for field in required_fields if not data.get(field)]
+        if missing:
+            return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database connection failed"}), 500
+        cursor = conn.cursor(dictionary=True)
+
+        _ensure_screening_tables(cursor)
+
+        cursor.execute("""
+            INSERT INTO interviews
+            (candidate_id, requirement_id, category, stage, date, time, duration, mode, location, interviewer, notes, status)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            data["candidate_id"],
+            data["requirement_id"],
+            data["category"],
+            data["stage"],
+            data["date"],
+            data["time"],
+            data["duration"],
+            data["mode"],
+            data.get("location", ""),
+            data["interviewer"],
+            data.get("notes", ""),
+            data.get("status", "Scheduled")
+        ))
+        conn.commit()
+
+        _touch_candidate_progress(
+            cursor,
+            data["candidate_id"],
+            data["requirement_id"],
+            data["category"],
+            data["stage"]
+        )
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"status": "success"}), 201
+
+    except Exception as e:
+        print("❌ create_interview error:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@screening_bp.route("/interviews", methods=["GET"])
+def get_interviews():
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database connection failed"}), 500
+        cursor = conn.cursor(dictionary=True)
+
+        _ensure_screening_tables(cursor)
+
+        cursor.execute("""
+            SELECT
+                i.*,
+                c.name AS candidate_name,
+                c.email AS candidate_email,
+                r.title AS requirement_title
+            FROM interviews i
+            LEFT JOIN candidates c ON c.id = i.candidate_id
+            LEFT JOIN requirements r ON r.id = i.requirement_id
+            ORDER BY i.date DESC, i.time DESC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return jsonify(rows), 200
+    except Exception as e:
+        print("❌ get_interviews error:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@screening_bp.route("/update-stage", methods=["PUT"])
+def update_stage():
+    try:
+        data = request.json or {}
+        required_fields = ["interview_id", "stage", "candidate_id", "requirement_id"]
+        missing = [field for field in required_fields if not data.get(field)]
+        if missing:
+            return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database connection failed"}), 500
+        cursor = conn.cursor(dictionary=True)
+
+        _ensure_screening_tables(cursor)
+
+        cursor.execute(
+            "UPDATE interviews SET stage=%s WHERE id=%s",
+            (data["stage"], data["interview_id"])
+        )
+        conn.commit()
+
+        _touch_candidate_progress(
+            cursor,
+            data["candidate_id"],
+            data["requirement_id"],
+            data.get("category", "IT"),
+            data["stage"]
+        )
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        print("❌ update_stage error:", e)
+        return jsonify({"error": str(e)}), 500
+
+
 def _ensure_screening_tables(cursor):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS candidate_screening (
@@ -105,6 +249,7 @@ def _ensure_screening_tables(cursor):
             FOREIGN KEY (requirement_id) REFERENCES requirements(id)
         )
     """)
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS assesment_queue (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,6 +261,51 @@ def _ensure_screening_tables(cursor):
             FOREIGN KEY (requirement_id) REFERENCES requirements(id)
         )
     """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS candidate_progress (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT NOT NULL,
+            requirement_id VARCHAR(64) NOT NULL,
+            category VARCHAR(50),
+            current_stage VARCHAR(50),
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_progress (candidate_id, requirement_id),
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+            FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS interviews (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT NOT NULL,
+            requirement_id VARCHAR(64) NOT NULL,
+            category VARCHAR(50),
+            stage VARCHAR(100),
+            date DATE,
+            time TIME,
+            duration VARCHAR(50),
+            mode VARCHAR(50),
+            location VARCHAR(255),
+            interviewer VARCHAR(255),
+            notes TEXT,
+            status VARCHAR(50) DEFAULT 'Scheduled',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+            FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+        )
+    """)
+
+
+def _touch_candidate_progress(cursor, candidate_id, requirement_id, category, stage):
+    cursor.execute("""
+        INSERT INTO candidate_progress (candidate_id, requirement_id, category, current_stage)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            category=VALUES(category),
+            current_stage=VALUES(current_stage)
+    """, (candidate_id, requirement_id, category or "IT", stage))
 
 
 def _resolve_requirement(cursor, identifier):

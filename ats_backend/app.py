@@ -178,6 +178,41 @@ def initialize_database():
             );
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interviews (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                candidate_id INT NOT NULL,
+                requirement_id VARCHAR(50) NOT NULL,
+                category ENUM('IT','Non-IT'),
+                stage VARCHAR(100),
+                date DATE,
+                time TIME,
+                duration INT,
+                mode VARCHAR(50),
+                location VARCHAR(255),
+                interviewer VARCHAR(255),
+                notes TEXT,
+                status ENUM('Scheduled','In Progress','Completed','Cancelled') DEFAULT 'Scheduled',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+                FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_progress (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                candidate_id INT NOT NULL,
+                requirement_id VARCHAR(50) NOT NULL,
+                current_stage VARCHAR(100) DEFAULT 'Screening',
+                category ENUM('IT','Non-IT'),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+                    ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+                FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+            );
+        """)
+
         conn.commit()
         cursor.close()
         conn.close()
