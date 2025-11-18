@@ -1395,6 +1395,67 @@ def delete_user(id):
 
 
 
+# -------------------------------
+# Get all users (recent first)
+# -------------------------------
+@app.route("/create-screening-process", methods=["POST"])
+def create_screening_process():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""CREATE TABLE IF NOT EXISTS candidate_screening (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT NOT NULL,
+            requirement_id VARCHAR(50) NOT NULL,
+            ai_score FLOAT,
+            ai_rationale TEXT,
+            recommend ENUM('SCREENED','REJECTED','SHORTLISTED'),
+            red_flags JSON,
+            model_version VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+            FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+    );""")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"message": "✅ Screening process created successfully!"}), 200
+    except Exception as e:
+        print("❌ Error creating screening process:", e)
+        return jsonify({"message": "❌ Error creating screening Table", "error": str(e)}), 500
+
+
+@app.route("/create-assesement-queue", methods=["POST"])
+def create_assesement_queue():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""CREATE TABLE IF NOT EXISTS assesment_queue (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            candidate_id INT NOT NULL,
+            requirement_id VARCHAR(50) NOT NULL,
+            status ENUM('PENDING','IN_PROGRESS','DONE') DEFAULT 'PENDING',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+            FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+        );""")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"message": "✅ Assesment queue created successfully!"}), 200
+    except Exception as e:
+        print("❌ Error creating assesment queue:", e)
+        return jsonify({"message": "❌ Error creating assesment queue Table", "error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
 # -------------------------------------
 # Run Server
 # -------------------------------------
@@ -1402,9 +1463,11 @@ if __name__ == '__main__':
     # Import AI routes after env loading (to avoid circular import issues)
     from controllers.ai_chat_controller import register_ai_routes
     from controllers.ai_jd_controller import jd_bp
+    from controllers.ai_screening import screening_bp
     ensure_admin_exists()
     ensure_user_status_defaults()
     # Register AI assistant routes without altering existing endpoints
     register_ai_routes(app)
     app.register_blueprint(jd_bp)
+    app.register_blueprint(screening_bp)
     app.run(debug=True)

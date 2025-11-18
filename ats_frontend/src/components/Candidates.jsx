@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -19,6 +19,8 @@ export default function CandidateApplicationUI() {
   const [message, setMessage] = useState("");
   const [candidates, setCandidates] = useState([]);
   const [editCandidateId, setEditCandidateId] = useState(null);
+  const [requirementsOptions, setRequirementsOptions] = useState([]);
+  const [requirementsLoading, setRequirementsLoading] = useState(false);
 
   const recruiterIdFromQuery = searchParams.get("recruiterId");
   const createdByUserId = recruiterIdFromQuery ? parseInt(recruiterIdFromQuery) : (user?.id || null);
@@ -41,6 +43,28 @@ export default function CandidateApplicationUI() {
   useEffect(() => {
     fetchCandidates();
   }, [user]);
+
+  useEffect(() => {
+    const fetchRequirementsOptions = async () => {
+      try {
+        setRequirementsLoading(true);
+        const res = await fetch("http://localhost:5000/get-requirements");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setRequirementsOptions(data);
+        } else {
+          setRequirementsOptions([]);
+        }
+      } catch (err) {
+        console.error("Error loading requirements:", err);
+        setRequirementsOptions([]);
+      } finally {
+        setRequirementsLoading(false);
+      }
+    };
+
+    fetchRequirementsOptions();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -133,6 +157,65 @@ export default function CandidateApplicationUI() {
     }
   };
 
+  const [screeningResult, setScreeningResult] = useState(null);
+  const [screenLoading, setScreenLoading] = useState(false);
+  const [screenError, setScreenError] = useState("");
+  const [screenCandidate, setScreenCandidate] = useState(null);
+  const [showScreenModal, setShowScreenModal] = useState(false);
+  const [selectedRequirementId, setSelectedRequirementId] = useState("");
+  const [requirementSearch, setRequirementSearch] = useState("");
+
+  const filteredRequirements = useMemo(() => {
+    if (!requirementSearch) return requirementsOptions;
+    return requirementsOptions.filter((req) => {
+      const haystack = `${req.title} ${req.location} ${req.client_id || ""}`.toLowerCase();
+      return haystack.includes(requirementSearch.toLowerCase());
+    });
+  }, [requirementsOptions, requirementSearch]);
+
+  const openScreenModal = (candidate) => {
+    setScreenCandidate(candidate);
+    setSelectedRequirementId("");
+    setRequirementSearch("");
+    setScreenError("");
+    setShowScreenModal(true);
+  };
+
+  const handleScreenCandidate = async () => {
+    if (!screenCandidate || !selectedRequirementId) {
+      setScreenError("Please select a requirement to compare against.");
+      return;
+    }
+
+    setScreenLoading(true);
+    setScreenError("");
+
+    try {
+      const response = await fetch("http://localhost:5000/api/screen-candidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_id: screenCandidate.id,
+          requirement_id: selectedRequirementId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setScreenError(data.error || "AI screening failed");
+      } else {
+        setScreeningResult(data.result);
+        setShowScreenModal(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setScreenError("Server error. Check backend.");
+    }
+
+    setScreenLoading(false);
+  };
+ 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
       <div className="max-w-5xl mx-auto space-y-8">
@@ -287,6 +370,12 @@ export default function CandidateApplicationUI() {
             <span>Candidate List</span>
           </h2>
 
+          {screenLoading && (
+            <div className="text-center text-purple-300 py-4 animate-pulse">
+              🔍 AI is screening candidate... please wait
+            </div>
+          )}
+
           {candidates.length === 0 ? (
             <p className="text-gray-400 text-center py-8">No candidates found.</p>
           ) : (
@@ -321,6 +410,12 @@ export default function CandidateApplicationUI() {
                         >
                           Delete
                         </button>
+                        <button
+                          onClick={() => openScreenModal(candidate)}
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 transform hover:scale-105 transition-all text-xs font-semibold"
+                        >
+                          Screen Candidate
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -330,6 +425,148 @@ export default function CandidateApplicationUI() {
           )}
         </div>
       </div>
+
+      {/* Requirement Picker Modal */}
+      {showScreenModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-gray-800 border border-purple-500/30 rounded-2xl p-6 w-full max-w-xl shadow-2xl relative">
+            <button
+              onClick={() => {
+                setShowScreenModal(false);
+                setScreenError("");
+              }}
+              className="absolute top-4 right-4 text-gray-300 hover:text-white text-xl"
+            >
+              ✖
+            </button>
+
+            <h2 className="text-2xl font-bold mb-2 text-gradient text-center">Select Requirement</h2>
+            <p className="text-gray-400 text-sm text-center mb-4">
+              Choose which requirement you want to compare <span className="text-gray-200 font-semibold">{screenCandidate?.name}</span> against.
+            </p>
+
+            <input
+              type="text"
+              value={requirementSearch}
+              onChange={(e) => setRequirementSearch(e.target.value)}
+              placeholder="Search by title, client, or location"
+              className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all mb-4"
+            />
+
+            <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+              {requirementsLoading ? (
+                <p className="text-center text-gray-400 py-6">Loading requirements...</p>
+              ) : filteredRequirements.length === 0 ? (
+                <p className="text-center text-gray-400 py-6">No matching requirements found.</p>
+              ) : (
+                filteredRequirements.map((req) => (
+                  <button
+                    key={req.id}
+                    type="button"
+                    onClick={() => setSelectedRequirementId(req.id)}
+                    className={`w-full text-left bg-gray-700/40 border rounded-xl px-4 py-3 transition-all ${
+                      selectedRequirementId === req.id
+                        ? "border-cyan-400 shadow-lg shadow-cyan-500/20"
+                        : "border-purple-500/20 hover:border-purple-400/80"
+                    }`}
+                  >
+                    <div className="flex justify-between text-gray-200 font-semibold">
+                      <span>{req.title}</span>
+                      <span className="text-xs text-gray-400">{req.location || "--"}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Requirement ID: {req.id} • Skills: {req.skills_required || "--"}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {screenError && (
+              <p className="text-red-400 text-sm mt-3">{screenError}</p>
+            )}
+
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => {
+                  setShowScreenModal(false);
+                  setScreenError("");
+                }}
+                className="px-6 py-2 bg-gray-700/50 border border-purple-500/30 text-gray-300 rounded-xl hover:bg-gray-700/70 transition-all font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleScreenCandidate}
+                disabled={screenLoading || !selectedRequirementId}
+                className="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transform hover:scale-105 transition-all duration-300 shadow-lg shadow-emerald-500/40 font-semibold disabled:opacity-50"
+              >
+                {screenLoading ? "Screening..." : "Run AI Screening"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Screening Result Modal */}
+      {screeningResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-gray-800/80 border border-purple-500/40 rounded-2xl p-6 w-full max-w-lg shadow-xl relative">
+            <button
+              onClick={() => setScreeningResult(null)}
+              className="absolute top-4 right-4 text-gray-300 hover:text-white text-xl"
+            >
+              ✖
+            </button>
+
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent text-center mb-4">
+              🤖 AI Screening Result
+            </h2>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-gray-400 text-sm">AI Score</p>
+                <p className="text-3xl font-bold text-purple-300">{screeningResult.score}/100</p>
+              </div>
+
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Recommendation</p>
+                <span
+                  className={`px-4 py-1 rounded-xl text-sm font-semibold ${
+                    screeningResult.recommend === "SHORTLISTED"
+                      ? "bg-green-500/30 text-green-300 border border-green-500/50"
+                      : screeningResult.recommend === "REJECTED"
+                      ? "bg-red-500/30 text-red-300 border border-red-500/50"
+                      : "bg-yellow-500/30 text-yellow-300 border border-yellow-500/50"
+                  }`}
+                >
+                  {screeningResult.recommend}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-gray-400 text-sm mb-1">📌 Rationale</p>
+                <ul className="list-disc list-inside text-gray-300 space-y-1">
+                  {screeningResult.rationale.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {screeningResult.red_flags?.length > 0 && (
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">⚠ Red Flags</p>
+                  <ul className="list-disc list-inside text-red-300 space-y-1">
+                    {screeningResult.red_flags.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
