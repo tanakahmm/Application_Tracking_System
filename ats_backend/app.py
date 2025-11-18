@@ -46,6 +46,147 @@ db_config = {
     'database': os.getenv('DB_NAME', 'ats_system')
 }
 
+def initialize_database():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        print("⚙️ Initializing ATS database...")
+
+        # ------------------------- USERS TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100),
+                email VARCHAR(150) UNIQUE,
+                password_hash VARCHAR(255),
+                role ENUM('ADMIN','DELIVERY_MANAGER','TEAM_LEAD','RECRUITER','CLIENT','CANDIDATE'),
+                phone VARCHAR(20),
+                status VARCHAR(20) DEFAULT 'ACTIVE',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # ------------------------- USERDATA TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usersdata (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100),
+                email VARCHAR(150) UNIQUE,
+                phone VARCHAR(20),
+                role ENUM('ADMIN','DELIVERY_MANAGER','TEAM_LEAD','RECRUITER','CLIENT','CANDIDATE'),
+                status VARCHAR(20) DEFAULT 'ACTIVE',
+                password_hash VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # ------------------------- CLIENTS TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clients (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255),
+                contact_person VARCHAR(255),
+                email VARCHAR(255),
+                phone VARCHAR(50),
+                address TEXT,
+                status ENUM('ACTIVE','INACTIVE') DEFAULT 'ACTIVE',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # ------------------------- REQUIREMENTS TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirements (
+                id VARCHAR(50) PRIMARY KEY,
+                client_id INT,
+                title VARCHAR(255),
+                description TEXT,
+                location VARCHAR(100),
+                skills_required VARCHAR(255),
+                experience_required FLOAT,
+                ctc_range VARCHAR(100),
+                ecto_range VARCHAR(100),
+                status VARCHAR(50) DEFAULT 'OPEN',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(100),
+                FOREIGN KEY (client_id) REFERENCES clients(id)
+            );
+        """)
+
+        # ------------------------- REQUIREMENT ALLOCATIONS TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_allocations (
+                id VARCHAR(50) PRIMARY KEY,
+                requirement_id VARCHAR(50),
+                recruiter_id INT,
+                assigned_by INT,
+                status VARCHAR(20) DEFAULT 'ASSIGNED',
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (requirement_id) REFERENCES requirements(id),
+                FOREIGN KEY (recruiter_id) REFERENCES users(id),
+                FOREIGN KEY (assigned_by) REFERENCES users(id)
+            );
+        """)
+
+        # ------------------------- CANDIDATES TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidates (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255),
+                email VARCHAR(255),
+                phone VARCHAR(20),
+                skills TEXT,
+                education TEXT,
+                experience TEXT,
+                resume_filename VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by INT,
+                source VARCHAR(50) DEFAULT 'MANUAL',
+                FOREIGN KEY (created_by) REFERENCES users(id)
+            );
+        """)
+
+        # ------------------------- AI ASSESSMENT QUEUE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assesment_queue (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                candidate_id INT,
+                requirement_id VARCHAR(64),
+                status VARCHAR(32) DEFAULT 'PENDING',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+                FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+            );
+        """)
+
+        # ------------------------- AI CANDIDATE SCREENING TABLE -------------------------
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_screening (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                candidate_id INT,
+                requirement_id VARCHAR(64),
+                ai_score FLOAT,
+                ai_rationale JSON,
+                recommend VARCHAR(32),
+                red_flags JSON,
+                model_version VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (candidate_id) REFERENCES candidates(id),
+                FOREIGN KEY (requirement_id) REFERENCES requirements(id)
+            );
+        """)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✅ All ATS tables created successfully!")
+
+    except Exception as e:
+        print("❌ Error in initialize_database():", e)
+
+
 # Debug: Print DB config (mask password for security)
 print(f"🔧 DB Config: host={db_config['host']}, user={db_config['user']}, database={db_config['database']}, password={'***' if db_config['password'] else '(empty)'}")
 
@@ -1464,6 +1605,7 @@ if __name__ == '__main__':
     from controllers.ai_chat_controller import register_ai_routes
     from controllers.ai_jd_controller import jd_bp
     from controllers.ai_screening import screening_bp
+    initialize_database()
     ensure_admin_exists()
     ensure_user_status_defaults()
     # Register AI assistant routes without altering existing endpoints
