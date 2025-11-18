@@ -10,6 +10,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from utils.event_notifier import notify_event
 from utils.auth import get_current_user
+from services.ai_data_service import build_user_self_context
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -101,22 +102,22 @@ def ensure_admin_exists():
         cursor = conn.cursor(dictionary=True)
 
         # Check if admin already exists
-        cursor.execute("SELECT * FROM users WHERE email = %s", ("srini@thinqorsolutions.com",))
+        cursor.execute("SELECT * FROM users WHERE email = %s", ("gurramprajith@gmail.com",))
         existing_admin = cursor.fetchone()
 
         if existing_admin:
-            print("✅ Admin 'Srini' already exists.")
+            print("✅ Admin 'Prajith' already exists.")
         else:
             # Hash the password
-            hashed_pw = hashlib.sha256("Srini@2025".encode()).hexdigest()
+            hashed_pw = hashlib.sha256("Prajith".encode()).hexdigest()
 
             # Insert new admin
             cursor.execute("""
                 INSERT INTO users (name, email, password_hash, role, status)
                 VALUES (%s, %s, %s, 'ADMIN', 'ACTIVE')
-            """, ("Srini", "srini@thinqorsolutions.com", hashed_pw))
+            """, ("Prajith", "gurramprajith@gmail.com", hashed_pw))
             conn.commit()
-            print("✅ Admin 'Srini' inserted successfully.")
+            print("✅ Admin 'Prajith' inserted successfully.")
 
         cursor.close()
         conn.close()
@@ -554,6 +555,25 @@ def login():
 
     except Exception as e:
         return jsonify({"message": "❌ Error during login", "error": str(e)}), 500
+
+
+@app.route("/users/<int:user_id>/details", methods=["GET"])
+def get_user_details(user_id: int):
+    try:
+        viewer_role = request.args.get("role", "")
+        user_context = build_user_self_context(user_id, viewer_role)
+        if not user_context.get("profile"):
+            return jsonify({"message": "User not found"}), 404
+
+        return jsonify({
+            "profile": user_context.get("profile"),
+            "assignments": user_context.get("assignments", []),
+            "candidates": user_context.get("candidates", []),
+            "org_stats": user_context.get("org_stats"),
+        }), 200
+    except Exception as e:
+        print("❌ Error fetching user details:", e)
+        return jsonify({"message": "Error fetching user details", "error": str(e)}), 500
 
 
 @app.route('/signup', methods=['POST'])
@@ -1303,15 +1323,36 @@ def add_user():
 def update_user(id):
     try:
         data = request.json
-        name = data.get("name")
-        email = data.get("email")
-        phone = data.get("phone")
-        role = data.get("role")
-        status = data.get("status")
         password = data.get("password")  # optional
 
         conn = get_db_connection()
-        cursor = conn.cursor()
+        if not conn:
+            return jsonify({"message": "Database connection failed"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT name, email, phone, role, COALESCE(status,'ACTIVE') AS status FROM users WHERE id=%s",
+            (id,)
+        )
+        existing = cursor.fetchone()
+        if not existing:
+            cursor.close()
+            conn.close()
+            return jsonify({"message": "User not found"}), 404
+
+        name = data.get("name", existing["name"])
+        email = data.get("email", existing["email"])
+        phone = data.get("phone", existing["phone"])
+        role = data.get("role", existing["role"])
+        status = data.get("status", existing["status"] or "ACTIVE")
+
+        # basic validation
+        if not all([name, email]):
+            cursor.close()
+            conn.close()
+            return jsonify({"message": "Name and email are required"}), 400
+
+        update_values = [name, email, phone, role, status, id]
 
         if password:
             password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -1322,7 +1363,7 @@ def update_user(id):
         else:
             cursor.execute(
                 "UPDATE users SET name=%s, email=%s, phone=%s, role=%s, status=%s WHERE id=%s",
-                (name, email, phone, role, status, id)
+                update_values
             )
 
         conn.commit()

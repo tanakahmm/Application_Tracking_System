@@ -47,7 +47,6 @@ export default function CreateRequirements() {
 
       if (data.suggested_requirement) {
         setAutoData(data.suggested_requirement);
-        // Map AI response to form fields
         setForm(prev => ({
           ...prev,
           title: data.suggested_requirement.title || prev.title,
@@ -71,13 +70,15 @@ export default function CreateRequirements() {
   const canCreate = ["ADMIN", "DELIVERY_MANAGER"].includes(user?.role);
 
   useEffect(() => {
-    dispatch(fetchClients());   // ✅ Load client list on page open
+    dispatch(fetchClients());
   }, [dispatch]);
 
   if (!canCreate) {
     return (
-      <div className="flex justify-center mt-20 text-red-600 font-semibold">
-        ❌ You are not allowed to create requirements
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <div className="text-red-400 font-semibold text-xl">
+          ❌ You are not allowed to create requirements
+        </div>
       </div>
     );
   }
@@ -103,76 +104,128 @@ export default function CreateRequirements() {
           ctc_range: "",
           ectc_range: "",
         });
+        setJdText("");
       })
       .catch(() => alert("❌ Error creating requirement"));
   };
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 bg-white p-8 rounded-xl shadow-lg">
-      <h2 className="text-2xl font-bold text-indigo-700 mb-6">
-        Create New Requirement
-      </h2>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-gray-800/40 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-xl p-8">
+          <h2 className="text-3xl font-bold mb-6 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            Create New Requirement
+          </h2>
 
-      {/* ✨ AI JD Parser Section */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-        <label className="block text-sm font-medium mb-2">
-          📝 Paste Job Description (AI will auto-fill form)
-        </label>
-        <div className="flex gap-2">
-          <textarea
-            value={jdText}
-            onChange={(e) => setJdText(e.target.value)}
-            placeholder="Paste the complete job description here..."
-            className="flex-1 border p-3 rounded h-32 resize-none"
-          />
-          <button
-            type="button"
-            onClick={handleAutoFill}
-            disabled={aiLoading || !jdText.trim()}
-            className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-          >
-            {aiLoading ? "⏳ Processing..." : "✨ AI Fill"}
-          </button>
+          {/* AI JD Parser Section */}
+          <div className="mb-6 p-6 bg-gray-700/30 border border-purple-500/30 rounded-xl">
+            <label className="block text-sm font-medium mb-3 text-gray-300">
+              📝 Paste Job Description (AI will auto-fill form)
+            </label>
+            <div className="flex gap-3">
+              <textarea
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+                placeholder="Paste the complete job description here..."
+                className="flex-1 bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none h-32"
+              />
+              <button
+                type="button"
+                onClick={handleAutoFill}
+                disabled={aiLoading || !jdText.trim()}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all duration-300 shadow-lg shadow-purple-500/50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {aiLoading ? "⏳ Processing..." : "✨ AI Fill"}
+              </button>
+            </div>
+            {aiError && (
+              <p className="text-red-400 text-sm mt-3">⚠️ {aiError}</p>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
+            {/* Client Dropdown */}
+            <select
+              name="client_id"
+              value={form.client_id}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all col-span-2"
+              required
+            >
+              <option value="" className="bg-gray-800">Select Client</option>
+              {clients?.length > 0 &&
+                clients.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-gray-800">
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+
+            <input
+              name="title"
+              placeholder="Job Title"
+              value={form.title}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              required
+            />
+            <input
+              name="location"
+              placeholder="Location"
+              value={form.location}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              required
+            />
+
+            <input
+              name="experience_required"
+              placeholder="Experience (years)"
+              value={form.experience_required}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+            <input
+              name="skills_required"
+              placeholder="Skills (comma separated)"
+              value={form.skills_required}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+
+            <input
+              name="ctc_range"
+              placeholder="CTC Range"
+              value={form.ctc_range}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+            <input
+              name="ectc_range"
+              placeholder="Expected CTC"
+              value={form.ectc_range}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+
+            <textarea
+              name="description"
+              placeholder="Job Description"
+              value={form.description}
+              onChange={handleChange}
+              className="bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none col-span-2 h-32"
+              required
+            />
+            
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 text-white py-3 rounded-xl hover:from-cyan-600 hover:via-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all duration-300 shadow-lg shadow-purple-500/50 font-semibold col-span-2"
+            >
+              Create Requirement
+            </button>
+          </form>
         </div>
-        {aiError && (
-          <p className="text-red-600 text-sm mt-2">⚠️ {aiError}</p>
-        )}
       </div>
-
-      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-6">
-
-        {/* ✅ Client Dropdown */}
-        <select
-          name="client_id"
-          value={form.client_id}
-          onChange={handleChange}
-          className="border p-2 rounded col-span-2"
-          required
-        >
-          <option value="">Select Client</option>
-          {clients?.length > 0 &&
-            clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} {/* ✅ correct field */}
-              </option>
-            ))}
-        </select>
-
-        <input name="title" placeholder="Job Title" value={form.title} onChange={handleChange} className="border p-2 rounded" required/>
-        <input name="location" placeholder="Location" value={form.location} onChange={handleChange} className="border p-2 rounded" required/>
-
-        <input name="experience_required" placeholder="Experience (years)" value={form.experience_required} onChange={handleChange} className="border p-2 rounded"/>
-        <input name="skills_required" placeholder="Skills (comma separated)" value={form.skills_required} onChange={handleChange} className="border p-2 rounded"/>
-
-        <input name="ctc_range" placeholder="CTC Range" value={form.ctc_range} onChange={handleChange} className="border p-2 rounded"/>
-        <input name="ectc_range" placeholder="Expected CTC" value={form.ectc_range} onChange={handleChange} className="border p-2 rounded"/>
-
-        <textarea name="description" placeholder="Job Description" value={form.description} onChange={handleChange} className="border p-2 rounded col-span-2 h-24" required></textarea>
-        
-        <button className="bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 col-span-2">
-          Create Requirement
-        </button>
-      </form>
     </div>
   );
 }

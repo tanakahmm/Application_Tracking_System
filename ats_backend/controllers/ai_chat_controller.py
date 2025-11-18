@@ -19,6 +19,7 @@ from services.ai_data_service import (
     list_candidates_for_user,
     list_requirement_allocations,
     list_usersdata,
+    build_user_self_context,
 )
 
 
@@ -36,7 +37,10 @@ SYSTEM_PROMPT = (
 	"- usersdata: id, name, email, phone, role, status, created_at\n"
 	"Role rules: admin and delivery manager can access everything including candidates and allocations; "
 	"recruiters only see requirements allocated to them; clients only see requirements where client_id matches their id. "
-	"Never invent data. If a record or access is missing, say so directly and offer available related information."
+	"Never invent data. If a record or access is missing, say so directly and offer available related information. "
+	"Each request also includes self_profile (the requester's merged user record), self_assignments (requirements assigned to them), "
+	"self_candidates (candidates they created), and self_org_stats (org-wide counts for admins/DMs). "
+	"Use those first whenever the user asks personal questions such as 'what is my phone number' or 'which requirements are assigned to me'."
 )
 
 
@@ -73,7 +77,18 @@ def chat() -> Any:
 	# 2) Simple routing/intent
 	intent = _detect_intent(message)
 
-	context: Dict[str, Any] = {"user": {"id": user.get("id"), "role": user.get("role"), "client_id": user.get("client_id")}, "query": message}
+	self_context = build_user_self_context(user.get("id"), user.get("role"))
+
+	context: Dict[str, Any] = {
+		"user": {"id": user.get("id"), "role": user.get("role"), "client_id": user.get("client_id")},
+		"query": message,
+		"self_profile": self_context.get("profile"),
+		"self_assignments": self_context.get("assignments", []),
+		"self_candidates": self_context.get("candidates", []),
+	}
+
+	if self_context.get("org_stats"):
+		context["self_org_stats"] = self_context["org_stats"]
 
 	try:
 		# 3) Fetch ATS data with role-based filtering

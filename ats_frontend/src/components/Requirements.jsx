@@ -20,9 +20,6 @@ export default function Requirements() {
 
   const [assignedList, setAssignedList] = useState([]);
 
-  // -----------------------------------
-  // INITIAL LOAD
-  // -----------------------------------
   useEffect(() => {
     dispatch(fetchRequirements());
     dispatch(fetchClients());
@@ -34,9 +31,6 @@ export default function Requirements() {
     else setAssignedList([]);
   }, [requirements]);
 
-  // -----------------------------------
-  // LOAD RECRUITERS
-  // -----------------------------------
   const loadRecruiters = async () => {
     try {
       const res = await fetch("http://localhost:5000/get-recruiters");
@@ -47,15 +41,11 @@ export default function Requirements() {
     }
   };
 
-  // -----------------------------------
-  // LOAD ASSIGNED RECRUITERS
-  // -----------------------------------
   const fetchAssignedRecruiters = async (reqList) => {
     try {
       const all = await Promise.all(
         reqList.map(async (req) => {
-          const res = await fetch(`http://localhost:5000/requirements/${req.id}/allocations`
-          );
+          const res = await fetch(`http://localhost:5000/requirements/${req.id}/allocations`);
 
           if (!res.ok) return [];
 
@@ -82,9 +72,6 @@ export default function Requirements() {
   const canCreate = ["ADMIN", "DELIVERY_MANAGER"].includes(user?.role);
   const canAssign = ["ADMIN", "DELIVERY_MANAGER"].includes(user?.role);
 
-  // -----------------------------------
-  // ASSIGN RECRUITER SAVE
-  // -----------------------------------
   const handleAssignConfirm = async () => {
     if (!selectedReq || !selectedRecruiter) return;
 
@@ -135,9 +122,6 @@ export default function Requirements() {
     }
   };
 
-  // -----------------------------------
-  // DELETE REQUIREMENT INSTANTLY
-  // -----------------------------------
   const handleDelete = async (req) => {
     if (!window.confirm(`Delete ${req.title}?`)) return;
 
@@ -190,121 +174,131 @@ export default function Requirements() {
     ? requirements.filter((r) => r.client_id === Number(selectedClient))
     : requirements;
 
-  // -----------------------------------
-  // RETURN UI
-  // -----------------------------------
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Requirements</h2>
-        {canCreate && (
-          <button
-            onClick={() => navigate("/create-requirement")}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            + New Requirement
-          </button>
-        )}
-      </div>
-
-      {/* FILTER */}
-      <div className="mb-4">
-        <select
-          className="border px-4 py-2 rounded"
-          onChange={(e) => setSelectedClient(e.target.value)}
-        >
-          <option value="">All Clients</option>
-          {clients?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* LOADING */}
-      {loading && <p>Loading...</p>}
-
-      {/* REQUIREMENTS TABLE */}
-      {!loading && filteredRequirements.length > 0 && (
-        <div className="bg-white shadow rounded overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 text-left">Title</th>
-                <th className="p-2 text-left">Location</th>
-                <th className="p-2 text-left">Experience</th>
-                <th className="p-2 text-left">Skills</th>
-                <th className="p-2 text-left">Client</th>
-                <th className="p-2 text-left">Created By</th>
-                <th className="p-2 text-center">Status</th>
-                <th className="p-2 text-center">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredRequirements.map((req) => (
-                <tr key={req.id} className="border-t">
-                  <td className="p-2">{req.title}</td>
-                  <td className="p-2">{req.location}</td>
-                  <td className="p-2">{req.experience_required} yrs</td>
-                  <td className="p-2">{req.skills_required}</td>
-                  <td className="p-2">
-                    {clients.find((c) => c.id === req.client_id)?.name || "--"}
-                  </td>
-                  <td className="p-2">{req.created_by}</td>
-
-                  <td className="p-2 text-center">
-                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                      {req.status}
-                    </span>
-                  </td>
-
-                  <td className="p-2 text-center">
-                    <button
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-xs mr-2"
-                      onClick={() => {
-                        setSelectedReq(req);
-                        setShowAssignModal(true);
-                      }}
-                    >
-                      Assign
-                    </button>
-
-                    <button
-                      className="bg-red-600 text-white px-3 py-1 rounded text-xs"
-                      onClick={() => handleDelete(req)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+              Requirements
+            </h2>
+            <p className="text-gray-400 text-sm">Manage job requirements and assignments</p>
+          </div>
+          {canCreate && (
+            <button
+              onClick={() => navigate("/create-requirement")}
+              className="px-6 py-3 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 text-white rounded-xl hover:from-cyan-600 hover:via-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all duration-300 shadow-lg shadow-purple-500/50 font-semibold"
+            >
+              ➕ New Requirement
+            </button>
+          )}
         </div>
-      )}
 
-      {/* ASSIGN MODAL */}
-      {showAssignModal && (
-        <AssignModal
-          recruiters={recruiters}
-          selectedRecruiter={selectedRecruiter}
-          setSelectedRecruiter={setSelectedRecruiter}
-          selectedReq={selectedReq}
-          setShowAssignModal={setShowAssignModal}
-          handleAssignConfirm={handleAssignConfirm}
-        />
-      )}
+        {/* FILTER */}
+        <div className="bg-gray-800/40 backdrop-blur-xl border border-purple-500/30 rounded-xl shadow-xl p-4">
+          <select
+            className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+            onChange={(e) => setSelectedClient(e.target.value)}
+          >
+            <option value="" className="bg-gray-800">All Clients</option>
+            {clients?.map((c) => (
+              <option key={c.id} value={c.id} className="bg-gray-800">
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      {/* ASSIGNED TABLE */}
-      <AssignedRecruitersTable assignedList={assignedList} />
+        {/* LOADING */}
+        {loading && (
+          <div className="text-center py-12">
+            <p className="text-gray-400">Loading...</p>
+          </div>
+        )}
+
+        {/* REQUIREMENTS TABLE */}
+        {!loading && filteredRequirements.length > 0 && (
+          <div className="bg-gray-800/40 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-700/50">
+                  <tr>
+                    <th className="p-3 text-left text-gray-300 font-semibold">Title</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold">Location</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold">Experience</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold">Skills</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold">Client</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold">Created By</th>
+                    <th className="p-3 text-center text-gray-300 font-semibold">Status</th>
+                    <th className="p-3 text-center text-gray-300 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredRequirements.map((req) => (
+                    <tr key={req.id} className="border-t border-purple-500/20 hover:bg-gray-700/30 transition-colors">
+                      <td className="p-3 text-gray-300">{req.title}</td>
+                      <td className="p-3 text-gray-300">{req.location}</td>
+                      <td className="p-3 text-gray-300">{req.experience_required} yrs</td>
+                      <td className="p-3 text-gray-300">{req.skills_required}</td>
+                      <td className="p-3 text-gray-300">
+                        {clients.find((c) => c.id === req.client_id)?.name || "--"}
+                      </td>
+                      <td className="p-3 text-gray-300">{req.created_by}</td>
+
+                      <td className="p-3 text-center">
+                        <span className="px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-xs font-semibold">
+                          {req.status}
+                        </span>
+                      </td>
+
+                      <td className="p-3 text-center">
+                        {canAssign && (
+                          <button
+                            className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-lg text-xs mr-2 hover:from-blue-600 hover:to-cyan-600 transform hover:scale-105 transition-all font-semibold"
+                            onClick={() => {
+                              setSelectedReq(req);
+                              setShowAssignModal(true);
+                            }}
+                          >
+                            Assign
+                          </button>
+                        )}
+                        <button
+                          className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-lg text-xs hover:from-red-600 hover:to-pink-600 transform hover:scale-105 transition-all font-semibold"
+                          onClick={() => handleDelete(req)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ASSIGN MODAL */}
+        {showAssignModal && (
+          <AssignModal
+            recruiters={recruiters}
+            selectedRecruiter={selectedRecruiter}
+            setSelectedRecruiter={setSelectedRecruiter}
+            selectedReq={selectedReq}
+            setShowAssignModal={setShowAssignModal}
+            handleAssignConfirm={handleAssignConfirm}
+          />
+        )}
+
+        {/* ASSIGNED TABLE */}
+        <AssignedRecruitersTable assignedList={assignedList} />
+      </div>
     </div>
   );
 }
 
-/* ASSIGN MODAL */
 function AssignModal({
   recruiters,
   selectedRecruiter,
@@ -314,20 +308,20 @@ function AssignModal({
   handleAssignConfirm,
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center">
-      <div className="bg-white p-6 w-96 rounded shadow">
-        <h2 className="text-lg font-bold mb-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+      <div className="bg-gray-800 border border-purple-500/30 p-6 w-full max-w-md rounded-2xl shadow-2xl">
+        <h2 className="text-xl font-bold mb-4 text-gray-300">
           Assign Recruiter for {selectedReq.title}
         </h2>
 
         <select
-          className="border px-3 py-2 w-full mb-4 rounded"
+          className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
           value={selectedRecruiter}
           onChange={(e) => setSelectedRecruiter(e.target.value)}
         >
-          <option value="">Select Recruiter</option>
+          <option value="" className="bg-gray-800">Select Recruiter</option>
           {recruiters.map((r) => (
-            <option key={r.id} value={r.id}>
+            <option key={r.id} value={r.id} className="bg-gray-800">
               {r.name}
             </option>
           ))}
@@ -335,13 +329,13 @@ function AssignModal({
 
         <div className="flex justify-end gap-3">
           <button
-            className="px-4 py-2 border rounded"
+            className="px-6 py-2 bg-gray-700/50 border border-purple-500/30 text-gray-300 rounded-xl hover:bg-gray-700/70 transition-all font-semibold"
             onClick={() => setShowAssignModal(false)}
           >
             Cancel
           </button>
           <button
-            className="px-4 py-2 bg-green-600 text-white rounded"
+            className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 transform hover:scale-105 transition-all duration-300 shadow-lg shadow-emerald-500/50 font-semibold disabled:opacity-50"
             onClick={handleAssignConfirm}
             disabled={!selectedRecruiter}
           >
@@ -353,43 +347,51 @@ function AssignModal({
   );
 }
 
-/* ASSIGNED RECRUITERS TABLE */
 function AssignedRecruitersTable({ assignedList }) {
   return (
-    <div className="mt-8 bg-white p-4 rounded shadow">
-      <h3 className="text-xl font-bold mb-3">Assigned Recruiters</h3>
+    <div className="bg-gray-800/40 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-xl p-6">
+      <h3 className="text-xl font-bold mb-4 text-gray-300 flex items-center gap-2">
+        <span>👥</span>
+        <span>Assigned Recruiters</span>
+      </h3>
 
-      <table className="min-w-full text-sm border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border p-2">S.NO</th>
-            <th className="border p-2">Recruiter</th>
-            <th className="border p-2">Requirement</th>
-            <th className="border p-2">Assigned Date</th>
-            <th className="border p-2">Status</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {assignedList.length === 0 ? (
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-700/50">
             <tr>
-              <td className="p-3 text-center text-gray-500" colSpan="5">
-                No assignments yet
-              </td>
+              <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">S.NO</th>
+              <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Recruiter</th>
+              <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Requirement</th>
+              <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Assigned Date</th>
+              <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Status</th>
             </tr>
-          ) : (
-            assignedList.map((item, i) => (
-              <tr key={item.id}>
-                <td className="border p-2">{i + 1}</td>
-                <td className="border p-2">{item.recruiter}</td>
-                <td className="border p-2">{item.requirementTitle}</td>
-                <td className="border p-2">{item.assignedDate}</td>
-                <td className="border p-2">{item.status}</td>
+          </thead>
+
+          <tbody>
+            {assignedList.length === 0 ? (
+              <tr>
+                <td className="p-6 text-center text-gray-400" colSpan="5">
+                  No assignments yet
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              assignedList.map((item, i) => (
+                <tr key={item.id} className="border-t border-purple-500/20 hover:bg-gray-700/30 transition-colors">
+                  <td className="p-3 text-gray-300">{i + 1}</td>
+                  <td className="p-3 text-gray-300">{item.recruiter}</td>
+                  <td className="p-3 text-gray-300">{item.requirementTitle}</td>
+                  <td className="p-3 text-gray-400 text-xs">{item.assignedDate}</td>
+                  <td className="p-3">
+                    <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-xs font-semibold">
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

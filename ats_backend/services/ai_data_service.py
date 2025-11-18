@@ -462,3 +462,142 @@ def get_client_for_user(client_id: str, user: UserDict) -> Optional[Dict[str, An
 	return None
 
 
+def get_user_profile_summary(user_id: int) -> Optional[Dict[str, Any]]:
+
+	if not user_id:
+		return None
+
+	conn = get_db_connection()
+	if not conn:
+		return None
+	cursor = conn.cursor(dictionary=True)
+	try:
+		cursor.execute(
+			"""
+			SELECT 
+				u.id,
+				u.name,
+				u.email,
+				COALESCE(u.phone, ud.phone) AS phone,
+				u.role,
+				COALESCE(u.status, 'ACTIVE') AS status,
+				u.created_at AS joined_at
+			FROM users u
+			LEFT JOIN usersdata ud ON ud.email = u.email
+			WHERE u.id = %s
+			""",
+			(user_id,),
+		)
+		row = cursor.fetchone()
+		if not row:
+			return None
+		row["role_label"] = (row.get("role") or "").replace("_", " ").title()
+		return dict(row)
+	finally:
+		cursor.close()
+		conn.close()
+
+
+def list_assignments_for_user(user_id: int) -> List[Dict[str, Any]]:
+
+	if not user_id:
+		return []
+
+	return _fetch_all(
+		"""
+		SELECT
+			ra.id AS allocation_id,
+			ra.requirement_id,
+			ra.status,
+			ra.created_at AS assigned_date,
+			req.title,
+			req.location,
+			req.skills_required,
+			req.experience_required,
+			req.description,
+			req.ctc_range,
+			req.ecto_range,
+			req.status AS requirement_status,
+			client.name AS client_name,
+			assigner.name AS assigned_by
+		FROM requirement_allocations ra
+		JOIN requirements req ON req.id = ra.requirement_id
+		LEFT JOIN clients client ON client.id = req.client_id
+		LEFT JOIN users assigner ON assigner.id = ra.assigned_by
+		WHERE ra.recruiter_id = %s
+		ORDER BY ra.created_at DESC
+		""",
+		(user_id,),
+	)
+
+
+def list_candidates_created_by_user(user_id: int) -> List[Dict[str, Any]]:
+
+	if not user_id:
+		return []
+
+	return _fetch_all(
+		"""
+		SELECT
+			id,
+			name,
+			email,
+			phone,
+			skills,
+			education,
+			experience,
+			resume_filename,
+			source,
+			created_at
+		FROM candidates
+		WHERE created_by = %s
+		ORDER BY created_at DESC
+		""",
+		(user_id,),
+	)
+
+
+def get_org_stats_snapshot() -> Dict[str, Any]:
+
+	conn = get_db_connection()
+	if not conn:
+		return {}
+
+	cursor = conn.cursor(dictionary=True)
+	try:
+		cursor.execute(
+			"""
+			SELECT
+				(SELECT COUNT(*) FROM requirements) AS total_requirements,
+				(SELECT COUNT(*) FROM requirements WHERE status = 'OPEN') AS open_requirements,
+				(SELECT COUNT(*) FROM requirement_allocations) AS total_assignments,
+				(SELECT COUNT(*) FROM candidates) AS total_candidates,
+				(SELECT COUNT(*) FROM clients) AS total_clients,
+				(SELECT COUNT(*) FROM clients WHERE status = 'ACTIVE') AS active_clients,
+				(SELECT COUNT(*) FROM users WHERE role = 'RECRUITER') AS total_recruiters,
+				(SELECT COUNT(*) FROM users WHERE role = 'RECRUITER' AND COALESCE(status, 'ACTIVE') = 'ACTIVE') AS active_recruiters
+			"""
+		)
+		row = cursor.fetchone() or {}
+		return {k: int(row.get(k, 0) or 0) for k in row.keys()}
+	finally:
+		cursor.close()
+		conn.close()
+
+
+def build_user_self_context(user_id: Optional[int], role: Optional[str]) -> Dict[str, Any]:
+
+	role_upper = (role or "").upper()
+	profile = get_user_profile_summary(user_id) if user_id else None
+	assignments = list_assignments_for_user(user_id) if user_id else []
+	candidates = list_candidates_created_by_user(user_id) if user_id else []
+	org_stats = get_org_stats_snapshot() if role_upper in ["ADMIN", "DELIVERY_MANAGER"] else None
+
+	return {
+		"profile": profile,
+		"assignments": assignments,
+		"candidates": candidates,
+		"org_stats": org_stats,
+	}
+
+

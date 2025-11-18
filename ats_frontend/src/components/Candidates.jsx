@@ -20,15 +20,11 @@ export default function CandidateApplicationUI() {
   const [candidates, setCandidates] = useState([]);
   const [editCandidateId, setEditCandidateId] = useState(null);
 
-  // Get recruiterId from query params if coming from recruiter dashboard
   const recruiterIdFromQuery = searchParams.get("recruiterId");
-  // Use query param recruiterId if available, otherwise use logged-in user id
   const createdByUserId = recruiterIdFromQuery ? parseInt(recruiterIdFromQuery) : (user?.id || null);
 
-  // Fetch candidates from backend with role-based filtering
   const fetchCandidates = async () => {
     try {
-      // Pass user info to filter candidates by role
       const params = new URLSearchParams();
       if (user?.id) {
         params.append("user_id", user.id);
@@ -46,25 +42,21 @@ export default function CandidateApplicationUI() {
     fetchCandidates();
   }, [user]);
 
-  // Handle input changes
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handle file input
   const handleFileChange = (e) => {
     setResume(e.target.files[0]);
   };
 
-  // Submit or Update candidate
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const data = new FormData();
     Object.entries(formData).forEach(([key, value]) => data.append(key, value));
-    if (resume) data.append("resume", resume);
+    if (resume) data.append("resume_file", resume);
     
-    // Include created_by if user is a recruiter (only for new submissions, not updates)
     if (!editCandidateId && createdByUserId) {
       data.append("created_by", createdByUserId);
     }
@@ -83,7 +75,7 @@ export default function CandidateApplicationUI() {
 
       if (response.ok) {
         setMessage(`✅ ${result.message}`);
-        fetchCandidates(); // refresh list
+        fetchCandidates();
         setFormData({
           name: "",
           email: "",
@@ -95,7 +87,6 @@ export default function CandidateApplicationUI() {
         setResume(null);
         setEditCandidateId(null);
         
-        // Navigate back to recruiter dashboard if came from there
         const fromState = window.history.state?.usr?.from;
         if (fromState === "/recruiter-dashboard") {
           setTimeout(() => navigate("/recruiter-dashboard"), 1500);
@@ -109,7 +100,6 @@ export default function CandidateApplicationUI() {
     }
   };
 
-  // Edit candidate
   const handleEdit = (candidate) => {
     setEditCandidateId(candidate.id);
     setFormData({
@@ -123,7 +113,6 @@ export default function CandidateApplicationUI() {
     setMessage("✏ Editing candidate...");
   };
 
-  // Delete candidate
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this candidate?")) return;
     try {
@@ -145,188 +134,201 @@ export default function CandidateApplicationUI() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 bg-white shadow-lg rounded-2xl space-y-10">
-      {/* Form Section */}
-      <div>
-        <h2 className="text-2xl font-semibold mb-6 text-gray-800 text-center">
-          {editCandidateId ? "✏ Edit Candidate" : "🧾 Candidate Application"}
-        </h2>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
+      <div className="max-w-5xl mx-auto space-y-8">
+        {/* Form Section */}
+        <div className="bg-gray-800/40 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-xl p-8">
+          <h2 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            {editCandidateId ? "✏ Edit Candidate" : "🧾 Candidate Application"}
+          </h2>
 
-        {message && (
-          <p className="text-center mb-4 font-medium text-green-600">{message}</p>
-        )}
+          {message && (
+            <div className={`mb-6 p-4 rounded-xl backdrop-blur-sm ${
+              message.includes("✅") 
+                ? "bg-green-500/20 border border-green-500/50 text-green-300" 
+                : "bg-red-500/20 border border-red-500/50 text-red-300"
+            }`}>
+              <p className="text-center font-medium">{message}</p>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-300">Full Name</label>
+                <input
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  type="text"
+                  placeholder="Enter full name"
+                  className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-300">Email</label>
+                <input
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  type="email"
+                  placeholder="you@example.com"
+                  className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-300">Phone</label>
+                <input
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-300">Skills</label>
+                <input
+                  name="skills"
+                  value={formData.skills}
+                  onChange={handleChange}
+                  type="text"
+                  placeholder="React, Node.js, SQL..."
+                  className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1">Full Name</label>
-              <input
-                name="name"
-                value={formData.name}
+              <label className="block text-sm font-medium mb-2 text-gray-300">Education Summary</label>
+              <textarea
+                name="education"
+                value={formData.education}
                 onChange={handleChange}
-                type="text"
-                placeholder="Enter full name"
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-400"
-                required
+                placeholder="E.g., B.Tech in Computer Science from XYZ University"
+                className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
+                rows="3"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                name="email"
-                value={formData.email}
+              <label className="block text-sm font-medium mb-2 text-gray-300">Experience Summary</label>
+              <textarea
+                name="experience"
+                value={formData.experience}
                 onChange={handleChange}
-                type="email"
-                placeholder="you@example.com"
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-400"
-                required
+                placeholder="E.g., 3 years as Frontend Developer at ABC Corp"
+                className="w-full bg-gray-700/50 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
+                rows="4"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Phone</label>
-              <input
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                type="tel"
-                placeholder="+91 98765 43210"
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-400"
-              />
+              <label className="block text-sm font-medium mb-2 text-gray-300">Upload Resume (PDF/DOCX)</label>
+              <div className="border-dashed border-2 border-purple-500/30 rounded-xl p-6 text-center hover:border-purple-500/60 transition bg-gray-700/20">
+                <input
+                  type="file"
+                  id="resume"
+                  className="hidden"
+                  accept=".pdf,.docx,.doc"
+                  onChange={handleFileChange}
+                />
+                <label
+                  htmlFor="resume"
+                  className="cursor-pointer text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                >
+                  {editCandidateId ? "Click to upload new resume (optional)" : "Click to upload resume"}
+                </label>
+                {resume && <p className="text-sm text-gray-300 mt-2">{resume.name}</p>}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Skills</label>
-              <input
-                name="skills"
-                value={formData.skills}
-                onChange={handleChange}
-                type="text"
-                placeholder="React, Node.js, SQL..."
-                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-400"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Education Summary</label>
-            <textarea
-              name="education"
-              value={formData.education}
-              onChange={handleChange}
-              placeholder="E.g., B.Tech in Computer Science from XYZ University"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-400"
-              rows="3"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Experience Summary</label>
-            <textarea
-              name="experience"
-              value={formData.experience}
-              onChange={handleChange}
-              placeholder="E.g., 3 years as Frontend Developer at ABC Corp"
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-400"
-              rows="4"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Upload Resume (PDF/DOCX)</label>
-            <div className="border-dashed border-2 border-gray-300 rounded-lg p-6 text-center hover:border-green-400 transition">
-              <input
-                type="file"
-                id="resume"
-                className="hidden"
-                accept=".pdf,.docx,.doc"
-                onChange={handleFileChange}
-              />
-              <label
-                htmlFor="resume"
-                className="cursor-pointer text-green-600 hover:underline"
+            <div className="flex justify-between mt-6">
+              <button
+                type="submit"
+                className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl hover:from-cyan-600 hover:via-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all duration-300 shadow-lg shadow-purple-500/50 font-semibold"
               >
-                {editCandidateId ? "Click to upload new resume (optional)" : "Click to upload resume"}
-              </label>
-              {resume && <p className="text-sm text-gray-700 mt-2">{resume.name}</p>}
+                {editCandidateId ? "Update Candidate" : "Submit Application"}
+              </button>
+
+              <button
+                type="button"
+                className="bg-gray-700/50 border border-purple-500/30 text-gray-300 px-8 py-3 rounded-xl hover:bg-gray-700/70 transform hover:scale-105 transition-all duration-300 font-semibold"
+                onClick={() => {
+                  setFormData({
+                    name: "",
+                    email: "",
+                    phone: "",
+                    skills: "",
+                    education: "",
+                    experience: "",
+                  });
+                  setResume(null);
+                  setEditCandidateId(null);
+                  setMessage("");
+                }}
+              >
+                Clear
+              </button>
             </div>
-          </div>
+          </form>
+        </div>
 
-          <div className="flex justify-between mt-6">
-            <button
-              type="submit"
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-            >
-              {editCandidateId ? "Update Candidate" : "Submit Application"}
-            </button>
+        {/* Candidate List Section */}
+        <div className="bg-gray-800/40 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-xl p-6">
+          <h2 className="text-2xl font-bold mb-6 text-gray-300 flex items-center gap-2">
+            <span>📋</span>
+            <span>Candidate List</span>
+          </h2>
 
-            <button
-              type="reset"
-              className="border border-gray-300 px-6 py-2 rounded-lg hover:bg-gray-100 transition"
-              onClick={() => {
-                setFormData({
-                  name: "",
-                  email: "",
-                  phone: "",
-                  skills: "",
-                  education: "",
-                  experience: "",
-                });
-                setResume(null);
-                setEditCandidateId(null);
-                setMessage("");
-              }}
-            >
-              Clear
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Candidate List Section */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">📋 Candidate List</h2>
-
-        {candidates.length === 0 ? (
-          <p className="text-gray-500 text-center">No candidates found.</p>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-green-100 text-left">
-                <th className="p-3 border">Name</th>
-                <th className="p-3 border">Email</th>
-                <th className="p-3 border">Phone</th>
-                <th className="p-3 border">Skills</th>
-                <th className="p-3 border">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {candidates.map((candidate) => (
-                <tr key={candidate.id} className="hover:bg-gray-50">
-                  <td className="p-3 border">{candidate.name}</td>
-                  <td className="p-3 border">{candidate.email}</td>
-                  <td className="p-3 border">{candidate.phone}</td>
-                  <td className="p-3 border">{candidate.skills}</td>
-                  <td className="p-3 border flex gap-2">
-                    <button
-                      onClick={() => handleEdit(candidate)}
-                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(candidate.id)}
-                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          {candidates.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">No candidates found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-700/50">
+                  <tr>
+                    <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Name</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Email</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Phone</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Skills</th>
+                    <th className="p-3 text-left text-gray-300 font-semibold border-b border-purple-500/20">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {candidates.map((candidate) => (
+                    <tr key={candidate.id} className="border-b border-purple-500/20 hover:bg-gray-700/30 transition-colors">
+                      <td className="p-3 text-gray-300">{candidate.name}</td>
+                      <td className="p-3 text-gray-300">{candidate.email}</td>
+                      <td className="p-3 text-gray-300">{candidate.phone}</td>
+                      <td className="p-3 text-gray-300">{candidate.skills}</td>
+                      <td className="p-3 flex gap-2">
+                        <button
+                          onClick={() => handleEdit(candidate)}
+                          className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-cyan-600 transform hover:scale-105 transition-all text-xs font-semibold"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(candidate.id)}
+                          className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-pink-600 transform hover:scale-105 transition-all text-xs font-semibold"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
