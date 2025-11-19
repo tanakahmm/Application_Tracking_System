@@ -51,9 +51,9 @@ def initialize_database():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        print("⚙️ Initializing ATS database...")
+        print("⚙ Initializing ATS database...")
 
-        # ------------------------- USERS TABLE -------------------------
+        # ---------------- USERS TABLE ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -67,7 +67,7 @@ def initialize_database():
             );
         """)
 
-        # ------------------------- USERDATA TABLE -------------------------
+        # ---------------- USERDATA TABLE ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS usersdata (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -81,7 +81,7 @@ def initialize_database():
             );
         """)
 
-        # ------------------------- CLIENTS TABLE -------------------------
+        # ---------------- CLIENT TABLE ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS clients (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -95,7 +95,7 @@ def initialize_database():
             );
         """)
 
-        # ------------------------- REQUIREMENTS TABLE -------------------------
+        # ---------------- REQUIREMENTS TABLE ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS requirements (
                 id VARCHAR(50) PRIMARY KEY,
@@ -106,7 +106,7 @@ def initialize_database():
                 skills_required VARCHAR(255),
                 experience_required FLOAT,
                 ctc_range VARCHAR(100),
-                ecto_range VARCHAR(100),
+                ectc_range VARCHAR(100),
                 status VARCHAR(50) DEFAULT 'OPEN',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(100),
@@ -114,7 +114,7 @@ def initialize_database():
             );
         """)
 
-        # ------------------------- REQUIREMENT ALLOCATIONS TABLE -------------------------
+        # ---------------- REQUIREMENT ALLOCATIONS ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS requirement_allocations (
                 id VARCHAR(50) PRIMARY KEY,
@@ -130,7 +130,7 @@ def initialize_database():
             );
         """)
 
-        # ------------------------- CANDIDATES TABLE -------------------------
+        # ---------------- CANDIDATE TABLE ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS candidates (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -148,36 +148,38 @@ def initialize_database():
             );
         """)
 
-        # ------------------------- AI ASSESSMENT QUEUE -------------------------
+        # ---------------- AI ASSESSMENT QUEUE ----------------
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS assesment_queue (
+            CREATE TABLE IF NOT EXISTS assessment_queue (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 candidate_id INT,
                 requirement_id VARCHAR(64),
-                status VARCHAR(32) DEFAULT 'PENDING',
+                status ENUM('PENDING','COMPLETED','FAILED') DEFAULT 'PENDING',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (candidate_id) REFERENCES candidates(id),
                 FOREIGN KEY (requirement_id) REFERENCES requirements(id)
             );
         """)
 
-        # ------------------------- AI CANDIDATE SCREENING TABLE -------------------------
+        # ---------------- CANDIDATE SCREENING ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS candidate_screening (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 candidate_id INT,
                 requirement_id VARCHAR(64),
                 ai_score FLOAT,
-                ai_rationale JSON,
+                ai_rationale TEXT,
                 recommend VARCHAR(32),
-                red_flags JSON,
+                red_flags TEXT,
                 model_version VARCHAR(50),
+                status ENUM('PENDING','DONE','ERROR') DEFAULT 'PENDING',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (candidate_id) REFERENCES candidates(id),
                 FOREIGN KEY (requirement_id) REFERENCES requirements(id)
             );
         """)
 
+        # ---------------- INTERVIEWS ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS interviews (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -199,6 +201,7 @@ def initialize_database():
             );
         """)
 
+        # ---------------- CANDIDATE PROGRESS ----------------
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS candidate_progress (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -206,6 +209,9 @@ def initialize_database():
                 requirement_id VARCHAR(50) NOT NULL,
                 current_stage VARCHAR(100) DEFAULT 'Screening',
                 category ENUM('IT','Non-IT'),
+                status ENUM('REVIEW_REQUIRED','IN_PROGRESS','HOLD','REJECTED','COMPLETED') 
+                    DEFAULT 'REVIEW_REQUIRED',
+                manual_decision ENUM('MOVE_NEXT','HOLD','REJECT','NONE') DEFAULT 'NONE',
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
                     ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (candidate_id) REFERENCES candidates(id),
@@ -216,11 +222,10 @@ def initialize_database():
         conn.commit()
         cursor.close()
         conn.close()
-        print("✅ All ATS tables created successfully!")
+        print("✅ Database schema loaded successfully!")
 
     except Exception as e:
-        print("❌ Error in initialize_database():", e)
-
+        print("❌ Error initializing DB:", e)
 
 # Debug: Print DB config (mask password for security)
 print(f"🔧 DB Config: host={db_config['host']}, user={db_config['user']}, database={db_config['database']}, password={'***' if db_config['password'] else '(empty)'}")

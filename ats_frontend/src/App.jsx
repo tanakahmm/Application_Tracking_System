@@ -14,6 +14,7 @@ import FloatingAiChat from "./components/FloatingAiChat";
 import Users from "./components/users";
 import RecruiterDashboard from "./components/RecruiterDashboard";
 import Interviews from "./components/Interviews";
+import CandidateTracking from "./components/CandidateTracking";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/users" element={<Users />} />
         <Route path="/recruiter-dashboard" element={<RecruiterDashboard />} />
         <Route path="/interviews" element={<Interviews />} />
+        <Route path="/candidate-tracking/:candidateId/:requirementId" element={<CandidateTracking />} />
 
 
         {/* Add other routes as needed */}
