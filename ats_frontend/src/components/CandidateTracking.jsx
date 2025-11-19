@@ -10,7 +10,7 @@ import {
 
 const stageTemplates = {
   IT: [
-    "Manual Review",
+    "Screening",
     "HR Screening",
     "Technical Round 1",
     "Technical Round 2",
@@ -18,7 +18,7 @@ const stageTemplates = {
     "Offer Discussion",
   ],
   "Non-IT": [
-    "Manual Review",
+    "Screening",
     "HR Screening",
     "Aptitude Test",
     "Operations Round",

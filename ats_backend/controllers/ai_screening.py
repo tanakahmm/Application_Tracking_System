@@ -22,7 +22,7 @@ def screen_candidate():
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(dictionary=True, buffered=True)
 
         _ensure_screening_tables(cursor)
 
@@ -122,7 +122,7 @@ def create_interview():
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(dictionary=True, buffered=True)
 
         _ensure_screening_tables(cursor)
 
@@ -171,7 +171,7 @@ def get_interviews():
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(dictionary=True, buffered=True)
 
         _ensure_screening_tables(cursor)
 
@@ -207,7 +207,7 @@ def update_stage():
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(dictionary=True, buffered=True)
 
         _ensure_screening_tables(cursor)
 
@@ -252,7 +252,7 @@ def recruiter_decision():
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(dictionary=True, buffered=True)
 
         _ensure_screening_tables(cursor)
 
@@ -305,7 +305,7 @@ def get_candidate_progress(candidate_id, req_ref):
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(dictionary=True, buffered=True)
 
         _ensure_screening_tables(cursor)
 
@@ -452,7 +452,7 @@ def _resolve_requirement(cursor, identifier):
     if not identifier:
         return None
 
-    cursor.execute("SELECT * FROM requirements WHERE id = %s", (identifier,))
+    cursor.execute("SELECT * FROM requirements WHERE id = %s",(str(identifier),))
     row = cursor.fetchone()
     if row:
         return row
